@@ -1,16 +1,25 @@
-
-# Playwright
+# Node dependencies
 node_modules/
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/dist/
-/test-logs/
+
+# Playwright reports and results
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Build artifacts
+dist/
+
+# Custom test logs
+test-logs/
+
+# macOS system file
 .DS_Store
+
+# Logs
 *.log
 npm-debug.log*
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+
+# Environment variables
+.env
+.env.*
