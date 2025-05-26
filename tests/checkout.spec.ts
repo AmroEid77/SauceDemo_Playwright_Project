@@ -56,15 +56,15 @@ fs.appendFileSync(masterSummaryPath, `[${new Date().toISOString()}] [${TEST_FILE
 const logToFile = (message, level = 'INFO') => {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] [${level}] ${message}\n`;
-    
+
     // Write to individual test run log
     fs.appendFileSync(logFilePath, logEntry);
-    
+
     // Also write important events to test file summary log
     if (level === 'ERROR' || level === 'SUMMARY' || message.includes('✅') || message.includes('❌')) {
         fs.appendFileSync(summaryLogPath, `[${timestamp}] [${testRunId}] ${message}\n`);
     }
-    
+
     // Write critical events to master summary
     if (level === 'ERROR' || level === 'CRITICAL' || message.includes('TEST START') || message.includes('COMPLETED')) {
         fs.appendFileSync(masterSummaryPath, `[${timestamp}] [${TEST_FILE_NAME}] [${testRunId}] ${message}\n`);
@@ -75,20 +75,20 @@ const logToFile = (message, level = 'INFO') => {
 const timeAction = async (actionName, actionFn, context = '') => {
     const startTime = Date.now();
     const fullContext = context ? `${context} - ${actionName}` : actionName;
-    
+
     logToFile(`⏱️  STARTING: ${fullContext}`, 'ACTION');
-    
+
     try {
         const result = await actionFn();
         const duration = Date.now() - startTime;
         logToFile(`✅ COMPLETED: ${fullContext} (${duration}ms)`, 'SUCCESS');
-        
+
         // Log performance warnings
         if (duration > 5000) {
             logToFile(`⚠️  SLOW OPERATION: ${fullContext} took ${duration}ms`, 'WARNING');
             testStats.slowOps++;
         }
-        
+
         return result;
     } catch (error) {
         const duration = Date.now() - startTime;
@@ -131,7 +131,7 @@ const cleanupOldLogs = () => {
         if (files.length > 10) {
             const filesToDelete = files.slice(10);
             logToFile(`🗑️  Cleaning up ${filesToDelete.length} old log files`, 'INFO');
-            
+
             filesToDelete.forEach(file => {
                 fs.unlinkSync(file.path);
                 logToFile(`🗑️  Deleted old log: ${file.name}`, 'INFO');
@@ -180,32 +180,32 @@ test.describe('Checkout Feature', () => {
     test.beforeAll(async ({ authenticatedPage }) => {
         logTestEnvironment();
         cleanupOldLogs();
-        
+
         logToFile(`🚀 [BeforeAll] Starting ${TEST_DISPLAY_NAME} suite setup...`, 'SUMMARY');
-        
+
         await timeAction('Page load state wait', async () => {
             await authenticatedPage.waitForLoadState('networkidle', { timeout: 15000 });
         }, 'BeforeAll Setup');
-        
+
         logToFile(`✅ [BeforeAll] ${TEST_DISPLAY_NAME} suite setup completed`, 'SUMMARY');
     });
 
     test.beforeEach(async ({ inventoryPage, cartPage, authenticatedPage }) => {
         logToFile('🔄 [BeforeEach] Starting individual test setup...', 'INFO');
-        
+
         await timeAction('Navigate to inventory page', async () => {
-            await authenticatedPage.goto('/inventory.html', { 
+            await authenticatedPage.goto('/inventory.html', {
                 waitUntil: 'networkidle',
-                timeout: 10000 
+                timeout: 10000
             });
         }, 'BeforeEach Navigation');
 
         await timeAction('Wait for inventory page to load', async () => {
             await inventoryPage.isLoaded();
         }, 'BeforeEach Verification');
-        
+
         await timeAction('Add product to cart', async () => {
-            await inventoryPage.addProductToCart('Sauce Labs Backpack');
+            await inventoryPage.addProductToCart(process.env.PRODUCT_NAME_TEST as string);
             logToFile(`🛍️ Added 'Sauce Labs Backpack' to cart`, 'INFO');
         }, 'BeforeEach Cart Setup');
 
@@ -216,7 +216,7 @@ test.describe('Checkout Feature', () => {
         await timeAction('Wait for cart page to load', async () => {
             await cartPage.isLoaded();
         }, 'BeforeEach Cart Verification');
-        
+
         logToFile('✅ [BeforeEach] Individual test setup completed - Ready for checkout', 'INFO');
     });
 
@@ -229,7 +229,7 @@ test.describe('Checkout Feature', () => {
             await timeAction('Proceed to checkout from cart', async () => {
                 await cartPage.proceedToCheckout();
             }, 'Complete Checkout Test');
-            
+
             await timeAction('Verify checkout step 1 loaded', async () => {
                 await checkoutPage.isStep1Loaded();
             }, 'Complete Checkout Test');
@@ -237,7 +237,7 @@ test.describe('Checkout Feature', () => {
             // Step 2: Fill shipping information
             const shippingInfo = { firstName: 'John', lastName: 'Doe', postalCode: '12345' };
             logToFile(`📝 Filling shipping info: ${JSON.stringify(shippingInfo)}`, 'INFO');
-            
+
             await timeAction('Fill shipping information', async () => {
                 await checkoutPage.fillShippingInfo(shippingInfo.firstName, shippingInfo.lastName, shippingInfo.postalCode);
             }, 'Complete Checkout Test');
@@ -250,6 +250,10 @@ test.describe('Checkout Feature', () => {
             await timeAction('Verify overview step loaded', async () => {
                 await checkoutPage.isStep2Loaded();
             }, 'Complete Checkout Test');
+
+            await timeAction('Verify product exists in cart', async () => {
+                await checkoutPage.verifyItemInCart(process.env.PRODUCT_NAME_TEST as string);
+            }, 'Cart Remove Test');
 
             // Step 4: Complete the checkout
             await timeAction('Complete checkout process', async () => {
@@ -277,12 +281,12 @@ test.describe('Checkout Feature', () => {
             const cartCount = await timeAction('Get final cart count', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Complete Checkout Test');
-            
+
             logToFile(`🛒 Final cart count: ${cartCount}`, 'INFO');
             logToFile(`🎯 Cart emptied: ${cartCount === 0 ? 'PASS' : 'FAIL'}`, 'INFO');
-            
+
             expect(cartCount).toBe(0);
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Complete checkout flow passed successfully', 'SUMMARY');
 
@@ -302,7 +306,7 @@ test.describe('Checkout Feature', () => {
             await timeAction('Proceed to checkout from cart', async () => {
                 await cartPage.proceedToCheckout();
             }, 'Finish Button Test');
-            
+
             await timeAction('Verify checkout step 1 loaded', async () => {
                 await checkoutPage.isStep1Loaded();
             }, 'Finish Button Test');
@@ -310,7 +314,7 @@ test.describe('Checkout Feature', () => {
             // Step 2: Fill shipping information
             const shippingInfo = { firstName: 'Jane', lastName: 'Smith', postalCode: '54321' };
             logToFile(`📝 Filling shipping info: ${JSON.stringify(shippingInfo)}`, 'INFO');
-            
+
             await timeAction('Fill shipping information', async () => {
                 await checkoutPage.fillShippingInfo(shippingInfo.firstName, shippingInfo.lastName, shippingInfo.postalCode);
             }, 'Finish Button Test');
@@ -334,6 +338,8 @@ test.describe('Checkout Feature', () => {
             logToFile(`  - Tax: $${orderSummary.tax}`, 'INFO');
             logToFile(`  - Total: $${orderSummary.total}`, 'INFO');
 
+            // Check if info are correct
+            expect(orderSummary.total).toBeCloseTo(orderSummary.subtotal + orderSummary.tax, 2);
             // Step 4: Click the Finish button specifically
             await timeAction('Click Finish button to complete order', async () => {
                 await checkoutPage.clickFinishButton();
@@ -354,7 +360,7 @@ test.describe('Checkout Feature', () => {
             }, 'Finish Button Test');
 
             logToFile(`🎯 Completion page URL: ${completionUrl}`, 'INFO');
-            
+
             // Verify we're on the checkout complete page
             expect(completionUrl).toContain('checkout-complete');
 
@@ -373,7 +379,7 @@ test.describe('Checkout Feature', () => {
             }, 'Finish Button Test');
 
             logToFile(`🏠 Home page URL: ${homeUrl}`, 'INFO');
-            
+
             // Verify we're on the inventory page
             expect(homeUrl).toContain('inventory.html');
 
@@ -381,10 +387,10 @@ test.describe('Checkout Feature', () => {
             const finalCartCount = await timeAction('Get final cart count after finish', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Finish Button Test');
-            
+
             logToFile(`🛒 Final cart count after Finish: ${finalCartCount}`, 'INFO');
             logToFile(`🎯 Cart properly emptied: ${finalCartCount === 0 ? 'PASS' : 'FAIL'}`, 'INFO');
-            
+
             expect(finalCartCount).toBe(0);
 
             // Step 10: Verify page elements are properly loaded
@@ -552,6 +558,10 @@ test.describe('Checkout Feature', () => {
                 await cartPage.isLoaded();
             }, 'Cancel Checkout Test');
 
+            await timeAction('Verify product exists in cart', async () => {
+                await cartPage.verifyItemExists(process.env.PRODUCT_NAME_TEST as string);
+            }, 'Cart Check Test after canceling checkout');
+
             logToFile('🎯 Cancellation flow verification: PASS', 'INFO');
 
             testStats.passed++;
@@ -624,7 +634,7 @@ test.describe('Checkout Feature', () => {
 
             const calculatedTotal = summary.subtotal + summary.tax;
             const totalMatch = Math.abs(summary.total - calculatedTotal) < 0.01;
-            
+
             logToFile(`🧮 Calculation verification:`, 'INFO');
             logToFile(`  - Expected Total: $${calculatedTotal.toFixed(2)}`, 'INFO');
             logToFile(`  - Actual Total: $${summary.total}`, 'INFO');
@@ -646,14 +656,14 @@ test.describe('Checkout Feature', () => {
         // Calculate final statistics
         const duration = Date.now() - testStats.startTime;
         logTestStatistics({ ...testStats, duration });
-        
+
         logToFile('🏁 TEST SUITE COMPLETED', 'CRITICAL');
         logToFile(`📁 Detailed logs saved to: ${logFilePath}`, 'SUMMARY');
         logToFile(`📋 Test file summary: ${summaryLogPath}`, 'SUMMARY');
         logToFile(`📊 Master summary: ${masterSummaryPath}`, 'SUMMARY');
-        
+
         // Final summary to master log
-        fs.appendFileSync(masterSummaryPath, 
+        fs.appendFileSync(masterSummaryPath,
             `[${new Date().toISOString()}] [${TEST_FILE_NAME}] COMPLETED - ` +
             `Passed: ${testStats.passed}, Failed: ${testStats.failed}, ` +
             `Complete: ${testStats.completeCheckoutTests}, Validation: ${testStats.validationTests}, ` +

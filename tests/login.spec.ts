@@ -54,15 +54,15 @@ fs.appendFileSync(masterSummaryPath, `[${new Date().toISOString()}] [${TEST_FILE
 const logToFile = (message, level = 'INFO') => {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] [${level}] ${message}\n`;
-    
+
     // Write to individual test run log
     fs.appendFileSync(logFilePath, logEntry);
-    
+
     // Also write important events to test file summary log
     if (level === 'ERROR' || level === 'SUMMARY' || message.includes('✅') || message.includes('❌')) {
         fs.appendFileSync(summaryLogPath, `[${timestamp}] [${testRunId}] ${message}\n`);
     }
-    
+
     // Write critical events to master summary
     if (level === 'ERROR' || level === 'CRITICAL' || message.includes('TEST START') || message.includes('COMPLETED')) {
         fs.appendFileSync(masterSummaryPath, `[${timestamp}] [${TEST_FILE_NAME}] [${testRunId}] ${message}\n`);
@@ -73,20 +73,20 @@ const logToFile = (message, level = 'INFO') => {
 const timeAction = async (actionName, actionFn, context = '') => {
     const startTime = Date.now();
     const fullContext = context ? `${context} - ${actionName}` : actionName;
-    
+
     logToFile(`⏱️  STARTING: ${fullContext}`, 'ACTION');
-    
+
     try {
         const result = await actionFn();
         const duration = Date.now() - startTime;
         logToFile(`✅ COMPLETED: ${fullContext} (${duration}ms)`, 'SUCCESS');
-        
+
         // Log performance warnings
         if (duration > 5000) {
             logToFile(`⚠️  SLOW OPERATION: ${fullContext} took ${duration}ms`, 'WARNING');
             testStats.slowOps++;
         }
-        
+
         return result;
     } catch (error) {
         const duration = Date.now() - startTime;
@@ -129,7 +129,7 @@ const cleanupOldLogs = () => {
         if (files.length > 10) {
             const filesToDelete = files.slice(10);
             logToFile(`🗑️  Cleaning up ${filesToDelete.length} old log files`, 'INFO');
-            
+
             filesToDelete.forEach(file => {
                 fs.unlinkSync(file.path);
                 logToFile(`🗑️  Deleted old log: ${file.name}`, 'INFO');
@@ -174,7 +174,7 @@ test.describe('Login Feature', () => {
     test.beforeAll(async () => {
         logTestEnvironment();
         cleanupOldLogs();
-        
+
         logToFile(`🚀 [BeforeAll] Starting ${TEST_DISPLAY_NAME} suite setup...`, 'SUMMARY');
         logToFile(`🔧 Environment configuration loaded`, 'INFO');
         logToFile(`✅ [BeforeAll] ${TEST_DISPLAY_NAME} suite setup completed`, 'SUMMARY');
@@ -182,7 +182,7 @@ test.describe('Login Feature', () => {
 
     test.beforeEach(async ({ page }) => {
         logToFile('🔄 [BeforeEach] Starting individual test setup...', 'INFO');
-        
+
         await timeAction('Initialize page objects', async () => {
             loginPage = new LoginPage(page);
             inventoryPage = new InventoryPage(page);
@@ -191,7 +191,7 @@ test.describe('Login Feature', () => {
         await timeAction('Navigate to login page', async () => {
             await loginPage.goto();
         }, 'BeforeEach Navigation');
-        
+
         logToFile('✅ [BeforeEach] Individual test setup completed', 'INFO');
     });
 
@@ -200,10 +200,11 @@ test.describe('Login Feature', () => {
         testStats.authTests++;
 
         try {
+            console.log('Loaded STANDARD_USER:', process.env.STANDARD_USER);
             // Arrange
             const username = process.env.STANDARD_USER || 'standard_user';
             const password = process.env.PASSWORD || 'secret_sauce';
-            
+
             logToFile(`👤 Testing with username: ${username}`, 'INFO');
             logToFile(`🔑 Using password: ${password ? '[MASKED]' : '[EMPTY]'}`, 'INFO');
 
@@ -219,15 +220,15 @@ test.describe('Login Feature', () => {
 
             const currentUrl = page.url();
             logToFile(`🌐 Current page URL: ${currentUrl}`, 'INFO');
-            
+
             const urlContainsInventory = currentUrl.includes('/inventory.html');
             logToFile(`🎯 URL validation: ${urlContainsInventory ? 'PASS' : 'FAIL'}`, 'INFO');
-            
+
             expect(page.url()).toContain('/inventory.html');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Standard user login test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Standard user login test - ${error.message}`, 'ERROR');
@@ -243,7 +244,7 @@ test.describe('Login Feature', () => {
             // Arrange
             const username = process.env.LOCKED_OUT_USER || 'locked_out_user';
             const password = process.env.PASSWORD || 'secret_sauce';
-            
+
             logToFile(`👤 Testing locked out user: ${username}`, 'INFO');
             logToFile(`🔑 Using password: ${password ? '[MASKED]' : '[EMPTY]'}`, 'INFO');
 
@@ -255,14 +256,14 @@ test.describe('Login Feature', () => {
             // Assert
             const expectedErrorMessage = 'Sorry, this user has been locked out';
             logToFile(`🔍 Expected error message: "${expectedErrorMessage}"`, 'INFO');
-            
+
             await timeAction('Verify error message displayed', async () => {
                 await loginPage.verifyErrorMessage(expectedErrorMessage);
             }, 'Locked User Test');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Locked out user error validation passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Locked out user test - ${error.message}`, 'ERROR');
@@ -278,7 +279,7 @@ test.describe('Login Feature', () => {
             // Arrange
             const username = 'invalid_user';
             const password = 'invalid_password';
-            
+
             logToFile(`👤 Testing with invalid username: ${username}`, 'INFO');
             logToFile(`🔑 Testing with invalid password: [MASKED]`, 'INFO');
 
@@ -290,14 +291,14 @@ test.describe('Login Feature', () => {
             // Assert
             const expectedErrorMessage = 'Username and password do not match';
             logToFile(`🔍 Expected error message: "${expectedErrorMessage}"`, 'INFO');
-            
+
             await timeAction('Verify invalid credentials error message', async () => {
                 await loginPage.verifyErrorMessage(expectedErrorMessage);
             }, 'Invalid Credentials Test');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Invalid credentials error validation passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Invalid credentials test - ${error.message}`, 'ERROR');
@@ -313,7 +314,7 @@ test.describe('Login Feature', () => {
             // Arrange
             const username = '';
             const password = process.env.PASSWORD || 'secret_sauce';
-            
+
             logToFile(`👤 Testing with empty username: "${username}"`, 'INFO');
             logToFile(`🔑 Using valid password: ${password ? '[MASKED]' : '[EMPTY]'}`, 'INFO');
 
@@ -325,14 +326,14 @@ test.describe('Login Feature', () => {
             // Assert
             const expectedErrorMessage = 'Username is required';
             logToFile(`🔍 Expected error message: "${expectedErrorMessage}"`, 'INFO');
-            
+
             await timeAction('Verify empty username error message', async () => {
                 await loginPage.verifyErrorMessage(expectedErrorMessage);
             }, 'Empty Username Test');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Empty username validation passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Empty username test - ${error.message}`, 'ERROR');
@@ -348,7 +349,7 @@ test.describe('Login Feature', () => {
             // Arrange
             const username = process.env.STANDARD_USER || 'standard_user';
             const password = '';
-            
+
             logToFile(`👤 Testing with valid username: ${username}`, 'INFO');
             logToFile(`🔑 Testing with empty password: "${password}"`, 'INFO');
 
@@ -360,14 +361,14 @@ test.describe('Login Feature', () => {
             // Assert
             const expectedErrorMessage = 'Password is required';
             logToFile(`🔍 Expected error message: "${expectedErrorMessage}"`, 'INFO');
-            
+
             await timeAction('Verify empty password error message', async () => {
                 await loginPage.verifyErrorMessage(expectedErrorMessage);
             }, 'Empty Password Test');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Empty password validation passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Empty password test - ${error.message}`, 'ERROR');
@@ -379,14 +380,14 @@ test.describe('Login Feature', () => {
         // Calculate final statistics
         const duration = Date.now() - testStats.startTime;
         logTestStatistics({ ...testStats, duration });
-        
+
         logToFile('🏁 TEST SUITE COMPLETED', 'CRITICAL');
         logToFile(`📁 Detailed logs saved to: ${logFilePath}`, 'SUMMARY');
         logToFile(`📋 Test file summary: ${summaryLogPath}`, 'SUMMARY');
         logToFile(`📊 Master summary: ${masterSummaryPath}`, 'SUMMARY');
-        
+
         // Final summary to master log
-        fs.appendFileSync(masterSummaryPath, 
+        fs.appendFileSync(masterSummaryPath,
             `[${new Date().toISOString()}] [${TEST_FILE_NAME}] COMPLETED - ` +
             `Passed: ${testStats.passed}, Failed: ${testStats.failed}, ` +
             `Auth Tests: ${testStats.authTests}, Error Tests: ${testStats.errorTests}, ` +

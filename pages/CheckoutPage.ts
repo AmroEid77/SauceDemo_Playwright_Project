@@ -36,6 +36,8 @@ export class CheckoutPage {
     async isStep1Loaded() {
         await expect(this.page).toHaveURL(/checkout-step-one.html/, { timeout: 15000 });
         await expect(this.firstNameInput).toBeVisible({ timeout: 10000 });
+        await expect(this.lastNameInput).toBeVisible({ timeout: 10000 });
+        await expect(this.postalCodeInput).toBeVisible({ timeout: 10000 });
     }
 
     async isStep2Loaded() {
@@ -74,7 +76,6 @@ export class CheckoutPage {
         await this.finishButton.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 });
     }
-
     async clickFinishButton() {
         await this.finishButton.waitFor({ state: 'visible', timeout: 10000 });
         await this.finishButton.click();

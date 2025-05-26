@@ -54,15 +54,15 @@ fs.appendFileSync(masterSummaryPath, `[${new Date().toISOString()}] [${TEST_FILE
 const logToFile = (message, level = 'INFO') => {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] [${level}] ${message}\n`;
-    
+
     // Write to individual test run log
     fs.appendFileSync(logFilePath, logEntry);
-    
+
     // Also write important events to test file summary log
     if (level === 'ERROR' || level === 'SUMMARY' || message.includes('✅') || message.includes('❌')) {
         fs.appendFileSync(summaryLogPath, `[${timestamp}] [${testRunId}] ${message}\n`);
     }
-    
+
     // Write critical events to master summary
     if (level === 'ERROR' || level === 'CRITICAL' || message.includes('TEST START') || message.includes('COMPLETED')) {
         fs.appendFileSync(masterSummaryPath, `[${timestamp}] [${TEST_FILE_NAME}] [${testRunId}] ${message}\n`);
@@ -73,19 +73,19 @@ const logToFile = (message, level = 'INFO') => {
 const timeAction = async (actionName, actionFn, context = '') => {
     const startTime = Date.now();
     const fullContext = context ? `${context} - ${actionName}` : actionName;
-    
+
     logToFile(`⏱️  STARTING: ${fullContext}`, 'ACTION');
-    
+
     try {
         const result = await actionFn();
         const duration = Date.now() - startTime;
         logToFile(`✅ COMPLETED: ${fullContext} (${duration}ms)`, 'SUCCESS');
-        
+
         // Log performance warnings
         if (duration > 5000) {
             logToFile(`⚠️  SLOW OPERATION: ${fullContext} took ${duration}ms`, 'WARNING');
         }
-        
+
         return result;
     } catch (error) {
         const duration = Date.now() - startTime;
@@ -127,7 +127,7 @@ const cleanupOldLogs = () => {
         if (files.length > 10) {
             const filesToDelete = files.slice(10);
             logToFile(`🗑️  Cleaning up ${filesToDelete.length} old log files`, 'INFO');
-            
+
             filesToDelete.forEach(file => {
                 fs.unlinkSync(file.path);
                 logToFile(`🗑️  Deleted old log: ${file.name}`, 'INFO');
@@ -165,30 +165,30 @@ test.describe('Sort Feature', () => {
     test.beforeAll(async ({ authenticatedPage }) => {
         logTestEnvironment();
         cleanupOldLogs();
-        
+
         logToFile(`🚀 [BeforeAll] Starting ${TEST_DISPLAY_NAME} suite setup...`, 'SUMMARY');
-        
+
         await timeAction('Page load state wait', async () => {
             await authenticatedPage.waitForLoadState('networkidle', { timeout: 15000 });
         }, 'BeforeAll Setup');
-        
+
         logToFile(`✅ [BeforeAll] ${TEST_DISPLAY_NAME} suite setup completed`, 'SUMMARY');
     });
 
     test.beforeEach(async ({ inventoryPage, authenticatedPage }) => {
         logToFile('🔄 [BeforeEach] Starting individual test setup...', 'INFO');
-        
+
         await timeAction('Navigate to inventory page', async () => {
-            await authenticatedPage.goto('/inventory.html', { 
+            await authenticatedPage.goto('/inventory.html', {
                 waitUntil: 'networkidle',
-                timeout: 10000 
+                timeout: 10000
             });
         }, 'BeforeEach Navigation');
 
         await timeAction('Wait for inventory page to load', async () => {
             await inventoryPage.isLoaded();
         }, 'BeforeEach Verification');
-        
+
         logToFile('✅ [BeforeEach] Individual test setup completed', 'INFO');
     });
 
@@ -200,7 +200,7 @@ test.describe('Sort Feature', () => {
             const initialProducts = await timeAction('Get initial product list', async () => {
                 return await inventoryPage.getProductNames();
             }, 'A-Z Test');
-            
+
             logToFile(`📋 Initial products found: ${initialProducts.length}`, 'INFO');
             logToFile(`📋 Initial product list: [${initialProducts.join(', ')}]`, 'INFO');
 
@@ -222,7 +222,7 @@ test.describe('Sort Feature', () => {
             const productNames = await timeAction('Get sorted product names', async () => {
                 return await inventoryPage.getProductNames();
             }, 'A-Z Test');
-            
+
             logToFile(`📊 Products after A-Z sort: [${productNames.join(', ')}]`, 'INFO');
 
             // Verify sort order
@@ -233,10 +233,10 @@ test.describe('Sort Feature', () => {
             logToFile(`🎯 A-Z Sort Result: ${isCorrectOrder ? 'PASS' : 'FAIL'}`, 'SUMMARY');
 
             expect(productNames).toEqual(sortedNames);
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: A-Z sort test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: A-Z sort test - ${error.message}`, 'ERROR');
@@ -251,7 +251,7 @@ test.describe('Sort Feature', () => {
             const initialProducts = await timeAction('Get initial product list', async () => {
                 return await inventoryPage.getProductNames();
             }, 'Z-A Test');
-            
+
             logToFile(`📋 Initial products found: ${initialProducts.length}`, 'INFO');
             logToFile(`📋 Initial product list: [${initialProducts.join(', ')}]`, 'INFO');
 
@@ -270,7 +270,7 @@ test.describe('Sort Feature', () => {
             const productNames = await timeAction('Get sorted product names', async () => {
                 return await inventoryPage.getProductNames();
             }, 'Z-A Test');
-            
+
             logToFile(`📊 Products after Z-A sort: [${productNames.join(', ')}]`, 'INFO');
 
             const sortedNames = [...productNames].sort().reverse();
@@ -280,10 +280,10 @@ test.describe('Sort Feature', () => {
             logToFile(`🎯 Z-A Sort Result: ${isCorrectOrder ? 'PASS' : 'FAIL'}`, 'SUMMARY');
 
             expect(productNames).toEqual(sortedNames);
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Z-A sort test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Z-A sort test - ${error.message}`, 'ERROR');
@@ -298,7 +298,7 @@ test.describe('Sort Feature', () => {
             const initialPrices = await timeAction('Get initial prices', async () => {
                 return await inventoryPage.getProductPrices();
             }, 'Price Low-High Test');
-            
+
             logToFile(`💲 Initial prices found: ${initialPrices.length}`, 'INFO');
             logToFile(`💲 Initial price range: $${Math.min(...initialPrices)} - $${Math.max(...initialPrices)}`, 'INFO');
             logToFile(`💲 Initial prices: [$${initialPrices.join(', $')}]`, 'INFO');
@@ -318,17 +318,16 @@ test.describe('Sort Feature', () => {
             const prices = await timeAction('Get sorted prices', async () => {
                 return await inventoryPage.getProductPrices();
             }, 'Price Low-High Test');
-            
+
             logToFile(`📊 Prices after low-high sort: [$${prices.join(', $')}]`, 'INFO');
             logToFile(`💲 Sorted price range: $${Math.min(...prices)} - $${Math.max(...prices)}`, 'INFO');
-
             let orderCorrect = true;
             await timeAction('Verify price order', async () => {
                 for (let i = 1; i < prices.length; i++) {
-                    const comparison = `$${prices[i-1]} <= $${prices[i]}`;
+                    const comparison = `$${prices[i - 1]} <= $${prices[i]}`;
                     const isValid = prices[i] >= prices[i - 1];
                     logToFile(`🔍 Price comparison ${i}: ${comparison} = ${isValid}`, 'INFO');
-                    
+
                     if (!isValid) {
                         orderCorrect = false;
                         logToFile(`❌ Price order violation at index ${i}: ${comparison}`, 'ERROR');
@@ -336,12 +335,12 @@ test.describe('Sort Feature', () => {
                     expect(prices[i]).toBeGreaterThanOrEqual(prices[i - 1]);
                 }
             }, 'Price Low-High Test');
-            
+
             logToFile(`🎯 Price Low-High Sort Result: ${orderCorrect ? 'PASS' : 'FAIL'}`, 'SUMMARY');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Low-to-high price sort test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Low-to-high price sort test - ${error.message}`, 'ERROR');
@@ -356,7 +355,7 @@ test.describe('Sort Feature', () => {
             const initialPrices = await timeAction('Get initial prices', async () => {
                 return await inventoryPage.getProductPrices();
             }, 'Price High-Low Test');
-            
+
             logToFile(`💲 Initial prices found: ${initialPrices.length}`, 'INFO');
             logToFile(`💲 Initial price range: $${Math.max(...initialPrices)} - $${Math.min(...initialPrices)}`, 'INFO');
             logToFile(`💲 Initial prices: [$${initialPrices.join(', $')}]`, 'INFO');
@@ -376,17 +375,17 @@ test.describe('Sort Feature', () => {
             const prices = await timeAction('Get sorted prices', async () => {
                 return await inventoryPage.getProductPrices();
             }, 'Price High-Low Test');
-            
+
             logToFile(`📊 Prices after high-low sort: [$${prices.join(', $')}]`, 'INFO');
             logToFile(`💲 Sorted price range: $${Math.max(...prices)} - $${Math.min(...prices)}`, 'INFO');
 
             let orderCorrect = true;
             await timeAction('Verify price order', async () => {
                 for (let i = 1; i < prices.length; i++) {
-                    const comparison = `$${prices[i-1]} >= $${prices[i]}`;
+                    const comparison = `$${prices[i - 1]} >= $${prices[i]}`;
                     const isValid = prices[i] <= prices[i - 1];
                     logToFile(`🔍 Price comparison ${i}: ${comparison} = ${isValid}`, 'INFO');
-                    
+
                     if (!isValid) {
                         orderCorrect = false;
                         logToFile(`❌ Price order violation at index ${i}: ${comparison}`, 'ERROR');
@@ -394,12 +393,12 @@ test.describe('Sort Feature', () => {
                     expect(prices[i]).toBeLessThanOrEqual(prices[i - 1]);
                 }
             }, 'Price High-Low Test');
-            
+
             logToFile(`🎯 Price High-Low Sort Result: ${orderCorrect ? 'PASS' : 'FAIL'}`, 'SUMMARY');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: High-to-low price sort test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: High-to-low price sort test - ${error.message}`, 'ERROR');
@@ -411,16 +410,16 @@ test.describe('Sort Feature', () => {
         // Calculate final statistics
         const duration = Date.now() - testStats.startTime;
         logTestStatistics({ ...testStats, duration });
-        
+
         logTestStatistics(testStats);
-        
+
         logToFile('🏁 TEST SUITE COMPLETED', 'CRITICAL');
         logToFile(`📁 Detailed logs saved to: ${logFilePath}`, 'SUMMARY');
         logToFile(`📋 Test file summary: ${summaryLogPath}`, 'SUMMARY');
         logToFile(`📊 Master summary: ${masterSummaryPath}`, 'SUMMARY');
-        
+
         // Final summary to master log
-        fs.appendFileSync(masterSummaryPath, 
+        fs.appendFileSync(masterSummaryPath,
             `[${new Date().toISOString()}] [${TEST_FILE_NAME}] COMPLETED - ` +
             `Passed: ${testStats.passed}, Failed: ${testStats.failed}, Duration: ${Date.now() - testStats.startTime}ms\n`
         );

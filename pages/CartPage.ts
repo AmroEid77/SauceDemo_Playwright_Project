@@ -23,6 +23,7 @@ export class CartPage {
         await this.page.waitForLoadState('networkidle', { timeout: 5000 });
         return await this.cartItems.count();
     }
+    
 
     async removeItem(productName: string) {
         const item = this.cartItems.filter({ hasText: productName });

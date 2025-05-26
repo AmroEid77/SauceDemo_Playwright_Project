@@ -55,15 +55,15 @@ fs.appendFileSync(masterSummaryPath, `[${new Date().toISOString()}] [${TEST_FILE
 const logToFile = (message, level = 'INFO') => {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] [${level}] ${message}\n`;
-    
+
     // Write to individual test run log
     fs.appendFileSync(logFilePath, logEntry);
-    
+
     // Also write important events to test file summary log
     if (level === 'ERROR' || level === 'SUMMARY' || message.includes('✅') || message.includes('❌')) {
         fs.appendFileSync(summaryLogPath, `[${timestamp}] [${testRunId}] ${message}\n`);
     }
-    
+
     // Write critical events to master summary
     if (level === 'ERROR' || level === 'CRITICAL' || message.includes('TEST START') || message.includes('COMPLETED')) {
         fs.appendFileSync(masterSummaryPath, `[${timestamp}] [${TEST_FILE_NAME}] [${testRunId}] ${message}\n`);
@@ -74,20 +74,20 @@ const logToFile = (message, level = 'INFO') => {
 const timeAction = async (actionName, actionFn, context = '') => {
     const startTime = Date.now();
     const fullContext = context ? `${context} - ${actionName}` : actionName;
-    
+
     logToFile(`⏱️  STARTING: ${fullContext}`, 'ACTION');
-    
+
     try {
         const result = await actionFn();
         const duration = Date.now() - startTime;
         logToFile(`✅ COMPLETED: ${fullContext} (${duration}ms)`, 'SUCCESS');
-        
+
         // Log performance warnings
         if (duration > 5000) {
             logToFile(`⚠️  SLOW OPERATION: ${fullContext} took ${duration}ms`, 'WARNING');
             testStats.slowOps++;
         }
-        
+
         return result;
     } catch (error) {
         const duration = Date.now() - startTime;
@@ -130,7 +130,7 @@ const cleanupOldLogs = () => {
         if (files.length > 10) {
             const filesToDelete = files.slice(10);
             logToFile(`🗑️  Cleaning up ${filesToDelete.length} old log files`, 'INFO');
-            
+
             filesToDelete.forEach(file => {
                 fs.unlinkSync(file.path);
                 logToFile(`🗑️  Deleted old log: ${file.name}`, 'INFO');
@@ -177,20 +177,20 @@ test.describe('Cart Feature', () => {
     test.beforeAll(async ({ authenticatedPage }) => {
         logTestEnvironment();
         cleanupOldLogs();
-        
+
         logToFile(`🚀 [BeforeAll] Starting ${TEST_DISPLAY_NAME} suite setup...`, 'SUMMARY');
-        
+
         await timeAction('Wait for authenticated page network idle', async () => {
             await authenticatedPage.waitForLoadState('networkidle');
         }, 'BeforeAll Setup');
-        
+
         logToFile(`🔧 Authenticated session established`, 'INFO');
         logToFile(`✅ [BeforeAll] ${TEST_DISPLAY_NAME} suite setup completed`, 'SUMMARY');
     });
 
     test.beforeEach(async ({ inventoryPage, authenticatedPage }) => {
         logToFile('🔄 [BeforeEach] Starting individual test setup...', 'INFO');
-        
+
         await timeAction('Navigate to inventory page', async () => {
             await authenticatedPage.goto('/inventory.html');
         }, 'BeforeEach Navigation');
@@ -198,11 +198,11 @@ test.describe('Cart Feature', () => {
         await timeAction('Verify inventory page loaded', async () => {
             await inventoryPage.isLoaded();
         }, 'BeforeEach Verification');
-        
+
         logToFile('✅ [BeforeEach] Individual test setup completed - Cart state reset', 'INFO');
     });
 
-    test('should add item to cart', async ({ inventoryPage }) => {
+    test('should add item to cart', async ({ cartPage, inventoryPage }) => {
         logToFile('🛒 TEST START: Add single item to cart functionality', 'SUMMARY');
         testStats.cartAddTests++;
 
@@ -210,11 +210,11 @@ test.describe('Cart Feature', () => {
             // Arrange
             const productName = 'Sauce Labs Backpack';
             logToFile(`📦 Testing product: ${productName}`, 'INFO');
-            
+
             const initialCount = await timeAction('Get initial cart count', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Add Item Test');
-            
+
             logToFile(`🔢 Initial cart count: ${initialCount}`, 'INFO');
 
             // Act
@@ -226,15 +226,26 @@ test.describe('Cart Feature', () => {
             const newCount = await timeAction('Get updated cart count', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Add Item Test');
-            
+
             logToFile(`🔢 New cart count: ${newCount}`, 'INFO');
             logToFile(`✔️  Expected count: ${initialCount + 1}`, 'INFO');
-            
+
             expect(newCount).toBe(initialCount + 1);
-            
+            await timeAction('Navigate to cart page', async () => {
+                await inventoryPage.goToCart();
+            }, 'Cart Remove Test');
+
+            await timeAction('Verify cart page loaded', async () => {
+                await cartPage.isLoaded();
+            }, 'Cart Remove Test');
+
+            // Verify product is in cart
+            await timeAction('Verify product exists in cart', async () => {
+                await cartPage.verifyItemExists(productName);
+            }, 'Cart Remove Test');
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Add item to cart test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Add item to cart test - ${error.message}`, 'ERROR');
@@ -242,7 +253,7 @@ test.describe('Cart Feature', () => {
         }
     });
 
-    test('should remove item from inventory page', async ({ inventoryPage }) => {
+    test('should remove item from inventory page', async ({ cartPage, inventoryPage }) => {
         logToFile('🗑️  TEST START: Remove item from inventory page functionality', 'SUMMARY');
         testStats.cartRemoveTests++;
 
@@ -250,16 +261,17 @@ test.describe('Cart Feature', () => {
             // Arrange
             const productName = 'Sauce Labs Bike Light';
             logToFile(`📦 Testing product removal: ${productName}`, 'INFO');
-            
+
             await timeAction('Add product to cart (setup)', async () => {
                 await inventoryPage.addProductToCart(productName);
             }, 'Remove Item Test');
-            
+
             const initialCount = await timeAction('Get cart count after adding', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Remove Item Test');
-            
+
             logToFile(`🔢 Cart count after adding: ${initialCount}`, 'INFO');
+
 
             // Act
             await timeAction('Remove product from cart', async () => {
@@ -270,15 +282,28 @@ test.describe('Cart Feature', () => {
             const newCount = await timeAction('Get final cart count', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Remove Item Test');
-            
+
             logToFile(`🔢 Final cart count: ${newCount}`, 'INFO');
             logToFile(`✔️  Expected count: ${initialCount - 1}`, 'INFO');
-            
+
             expect(newCount).toBe(initialCount - 1);
-            
+
+            await timeAction('Navigate to cart page', async () => {
+                await inventoryPage.goToCart();
+            }, 'Cart Remove Test');
+
+            await timeAction('Verify cart page loaded', async () => {
+                await cartPage.isLoaded();
+            }, 'Cart Remove Test');
+
+            // Verify product is in cart
+            await timeAction('Verify product exists in cart', async () => {
+                await cartPage.verifyItemDoesNotExist(productName);
+            }, 'Cart Remove Test');
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Remove item from inventory page test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Remove item from inventory page test - ${error.message}`, 'ERROR');
@@ -289,15 +314,15 @@ test.describe('Cart Feature', () => {
     test('should add multiple items to cart', async ({ inventoryPage, cartPage }) => {
         logToFile('📦 TEST START: Add multiple items to cart functionality', 'SUMMARY');
         testStats.multiItemTests++;
-
         try {
             // Arrange
-            const products = [
-                'Sauce Labs Backpack',
-                'Sauce Labs Bike Light',
-                'Sauce Labs Bolt T-Shirt'
-            ];
-            
+            const rawProducts = process.env.PRODUCTS || '';
+            const products = rawProducts.split(',').map(p => p.trim());
+            console.log(products);
+            if (products.length === 0 || !products[0]) {
+                throw new Error('No products found in .env file.');
+            }
+
             logToFile(`📦 Testing multiple products: ${products.join(', ')}`, 'INFO');
             logToFile(`🔢 Expected final count: ${products.length}`, 'INFO');
 
@@ -313,10 +338,10 @@ test.describe('Cart Feature', () => {
             const cartCount = await timeAction('Get cart count after adding all items', async () => {
                 return await inventoryPage.getCartCount();
             }, 'Multi-Item Test');
-            
+
             logToFile(`🔢 Final cart count: ${cartCount}`, 'INFO');
             expect(cartCount).toBe(products.length);
-            
+
             // Verify cart contents
             await timeAction('Navigate to cart page', async () => {
                 await inventoryPage.goToCart();
@@ -329,7 +354,7 @@ test.describe('Cart Feature', () => {
             const itemsCount = await timeAction('Get cart items count', async () => {
                 return await cartPage.getCartItemsCount();
             }, 'Multi-Item Test');
-            
+
             logToFile(`🔢 Cart page items count: ${itemsCount}`, 'INFO');
             expect(itemsCount).toBe(products.length);
 
@@ -340,10 +365,10 @@ test.describe('Cart Feature', () => {
                     await cartPage.verifyItemExists(product);
                 }
             }, 'Multi-Item Test');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Add multiple items to cart test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Add multiple items to cart test - ${error.message}`, 'ERROR');
@@ -359,7 +384,7 @@ test.describe('Cart Feature', () => {
             // Arrange
             const productName = 'Sauce Labs Fleece Jacket';
             logToFile(`📦 Testing product removal from cart: ${productName}`, 'INFO');
-            
+
             await timeAction('Add product to cart (setup)', async () => {
                 await inventoryPage.addProductToCart(productName);
             }, 'Cart Remove Test');
@@ -376,11 +401,11 @@ test.describe('Cart Feature', () => {
             await timeAction('Verify product exists in cart', async () => {
                 await cartPage.verifyItemExists(productName);
             }, 'Cart Remove Test');
-            
+
             const initialCount = await timeAction('Get initial cart items count', async () => {
                 return await cartPage.getCartItemsCount();
             }, 'Cart Remove Test');
-            
+
             logToFile(`🔢 Initial cart items count: ${initialCount}`, 'INFO');
 
             // Act
@@ -392,25 +417,100 @@ test.describe('Cart Feature', () => {
             const newCount = await timeAction('Get final cart items count', async () => {
                 return await cartPage.getCartItemsCount();
             }, 'Cart Remove Test');
-            
+
             logToFile(`🔢 Final cart items count: ${newCount}`, 'INFO');
             logToFile(`✔️  Expected count: ${initialCount - 1}`, 'INFO');
-            
+
             expect(newCount).toBe(initialCount - 1);
-            
+
             await timeAction('Verify item no longer exists in cart', async () => {
                 await cartPage.verifyItemDoesNotExist(productName);
             }, 'Cart Remove Test');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Remove item from cart page test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Remove item from cart page test - ${error.message}`, 'ERROR');
             throw error;
         }
     });
+
+    test('should remove multiple items from cart page', async ({ inventoryPage, cartPage }) => {
+        logToFile('🗑️  TEST START: Remove multiple items from cart page functionality', 'SUMMARY');
+        testStats.cartRemoveTests++;
+        try {
+            const rawProducts = process.env.PRODUCTS || '';
+            const products = rawProducts.split(',').map(p => p.trim());
+            if (products.length === 0 || !products[0]) {
+                throw new Error('No products found in .env file.');
+            }
+            // Arrange
+            logToFile(`📦 Products to remove: ${products.join(', ')}`, 'INFO');
+
+            await timeAction('Add all products to cart (setup)', async () => {
+                for (const product of products) {
+                    logToFile(`➕ Adding product: ${product}`, 'INFO');
+                    await inventoryPage.addProductToCart(product);
+                }
+            }, 'Cart Remove Test');
+
+            await timeAction('Navigate to cart page', async () => {
+                await inventoryPage.goToCart();
+            }, 'Cart Remove Test');
+
+            await timeAction('Verify cart page loaded', async () => {
+                await cartPage.isLoaded();
+            }, 'Cart Remove Test');
+
+            await timeAction('Verify all products exist in cart before removal', async () => {
+                for (const product of products) {
+                    logToFile(`🔍 Verifying product in cart: ${product}`, 'INFO');
+                    await cartPage.verifyItemExists(product);
+                }
+            }, 'Cart Remove Test');
+
+            const initialCount = await timeAction('Get initial cart items count', async () => {
+                return await cartPage.getCartItemsCount();
+            }, 'Cart Remove Test');
+
+            logToFile(`🔢 Initial cart items count: ${initialCount}`, 'INFO');
+
+            // Act
+            await timeAction('Remove all items from cart', async () => {
+                for (const product of products) {
+                    logToFile(`🗑️ Removing product: ${product}`, 'INFO');
+                    await cartPage.removeItem(product);
+                }
+            }, 'Cart Remove Test');
+
+            // Assert
+            const newCount = await timeAction('Get final cart items count', async () => {
+                return await cartPage.getCartItemsCount();
+            }, 'Cart Remove Test');
+
+            logToFile(`🔢 Final cart items count: ${newCount}`, 'INFO');
+            logToFile(`✔️  Expected count: ${initialCount - products.length}`, 'INFO');
+            expect(newCount).toBe(initialCount - products.length);
+
+            await timeAction('Verify all products removed from cart', async () => {
+                for (const product of products) {
+                    logToFile(`❌ Verifying product is no longer in cart: ${product}`, 'INFO');
+                    await cartPage.verifyItemDoesNotExist(product);
+                }
+            }, 'Cart Remove Test');
+
+            testStats.passed++;
+            logToFile('✅ TEST COMPLETED: Remove multiple items from cart page test passed successfully', 'SUMMARY');
+
+        } catch (error) {
+            testStats.failed++;
+            logToFile(`❌ TEST FAILED: Remove multiple items from cart page test - ${error.message}`, 'ERROR');
+            throw error;
+        }
+    });
+
 
     test('should continue shopping from cart', async ({ inventoryPage, cartPage }) => {
         logToFile('🔄 TEST START: Continue shopping navigation functionality', 'SUMMARY');
@@ -435,12 +535,12 @@ test.describe('Cart Feature', () => {
             await timeAction('Verify returned to inventory page', async () => {
                 await inventoryPage.isLoaded();
             }, 'Continue Shopping Test');
-            
+
             logToFile('🔄 Successfully navigated back to inventory page', 'INFO');
-            
+
             testStats.passed++;
             logToFile('✅ TEST COMPLETED: Continue shopping navigation test passed successfully', 'SUMMARY');
-            
+
         } catch (error) {
             testStats.failed++;
             logToFile(`❌ TEST FAILED: Continue shopping navigation test - ${error.message}`, 'ERROR');
@@ -452,14 +552,14 @@ test.describe('Cart Feature', () => {
         // Calculate final statistics
         const duration = Date.now() - testStats.startTime;
         logTestStatistics({ ...testStats, duration });
-        
+
         logToFile('🏁 TEST SUITE COMPLETED', 'CRITICAL');
         logToFile(`📁 Detailed logs saved to: ${logFilePath}`, 'SUMMARY');
         logToFile(`📋 Test file summary: ${summaryLogPath}`, 'SUMMARY');
         logToFile(`📊 Master summary: ${masterSummaryPath}`, 'SUMMARY');
-        
+
         // Final summary to master log
-        fs.appendFileSync(masterSummaryPath, 
+        fs.appendFileSync(masterSummaryPath,
             `[${new Date().toISOString()}] [${TEST_FILE_NAME}] COMPLETED - ` +
             `Passed: ${testStats.passed}, Failed: ${testStats.failed}, ` +
             `Cart Add: ${testStats.cartAddTests}, Cart Remove: ${testStats.cartRemoveTests}, ` +
