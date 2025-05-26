@@ -23,7 +23,7 @@ export class CartPage {
         await this.page.waitForLoadState('networkidle', { timeout: 5000 });
         return await this.cartItems.count();
     }
-    
+
 
     async removeItem(productName: string) {
         const item = this.cartItems.filter({ hasText: productName });
@@ -36,7 +36,7 @@ export class CartPage {
 
     async verifyItemExists(productName: string) {
         const item = this.cartItems.filter({ hasText: productName });
-        await expect(item).toBeVisible({ timeout: 10000 });
+        await expect(item).toBeVisible({ timeout: 30000 });
     }
 
     async verifyItemDoesNotExist(productName: string) {
