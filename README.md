@@ -362,9 +362,8 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-**Abdullah Jamal Alharriem**
-- GitHub: [@your-github-username](https://github.com/your-github-username)
-- Email: your.email@example.com
+**Abdullah Jamal Alharriem and Amro Eid**
+
 
 ---
 
